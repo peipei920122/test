@@ -1,13 +1,13 @@
 # 載入必要模組
 import os
-# os.chdir(r'C:\Users\user\Dropbox\系務\專題實作\112\金融看板\for students')
+#os.chdir(r'C:\Users\user\Dropbox\系務\專題實作\112\金融看板\for students')
 #import haohaninfo
 #from order_Lo8 import Record
 import numpy as np
 #from talib.abstract import SMA,EMA, WMA, RSI, BBANDS, MACD
 #import sys
 import indicator_f_Lo2_short,datetime, indicator_forKBar_short
-import datetime
+#import datetime
 import pandas as pd
 import streamlit as st 
 import streamlit.components.v1 as stc 
@@ -31,9 +31,16 @@ stc.html(html_temp)
 # ## 保存为Pickle文件:
 # df_original.to_pickle('kbars_2330_2022-01-01-2022-11-18.pkl')
 
-## 读取Pickle文件
-df_original = pd.read_pickle('2303.pkl')
 
+
+@st.cache_data(ttl=3600, show_spinner="正在加載資料...") 
+def load_data(url):
+    df = pd.read_pickle(url)
+    return df
+
+
+
+df_original = load_data('2303.pkl')
 
 #df.columns  ## Index(['Unnamed: 0', 'time', 'open', 'low', 'high', 'close', 'volume','amount'], dtype='object')
 #df_original = df_original.drop('Unnamed: 0',axis=1)
@@ -47,24 +54,13 @@ df_original = pd.read_pickle('2303.pkl')
 
 
 ##### 選擇資料區間
-start_date = st.text_input('選擇開始日期 (日期格式: 2020/01/02)', '2020/01/02')
+st.subheader("選擇開始與結束的日期, 區間:2022/01/02 至 2024/06/03")
+start_date = st.text_input('選擇開始日期 (日期格式: 2022/01/02)', '2022/01/02')
 end_date = st.text_input('選擇結束日期 (日期格式: 2024/06/03)', '2024/06/03')
 start_date = datetime.datetime.strptime(start_date,'%Y/%m/%d')
 end_date = datetime.datetime.strptime(end_date,'%Y/%m/%d')
-
-start_date_timestamp = start_date.timestamp()
-end_date_timestamp = end_date.timestamp()
-
-# 將'time'列轉換為timestamp
-df_original['time_timestamp'] = df_original['time'].apply(lambda x: x.timestamp())
-
-# 選擇資料區間
-df = df_original[(df_original['time_timestamp'] >= start_date_timestamp) & 
-                 (df_original['time_timestamp'] <= end_date_timestamp)]
-
-# 刪除剛剛新增的'time_timestamp'列
-df.drop(columns=['time_timestamp'], inplace=True)
-
+# 使用条件筛选选择时间区间的数据
+df = df_original[(df_original['date'] >= start_date) & (df_original['date'] <= end_date)]
 
 
 ###### (2) 轉化為字典 ######:
@@ -81,13 +77,13 @@ KBar_dic['open']=np.array(KBar_open_list)
 #KBar_dic['open'].shape  ## (1596,)
 #KBar_dic['open'].size   ##  1596
 
-KBar_dic['product'] = np.repeat('tsmc', KBar_dic['open'].size)
+#KBar_dic['product'] = np.repeat('tsmc', KBar_dic['open'].size)
 #KBar_dic['product'].size   ## 1596
 #KBar_dic['product'][0]      ## 'tsmc'
 
-KBar_time_list = list(KBar_dic['time'].values())
+KBar_time_list = list(KBar_dic['date'].values())
 KBar_time_list = [i.to_pydatetime() for i in KBar_time_list] ## Timestamp to datetime
-KBar_dic['time']=np.array(KBar_time_list)
+KBar_dic['date']=np.array(KBar_time_list)
 
 # KBar_time_list[0]        ## Timestamp('2022-07-01 09:01:00')
 # type(KBar_time_list[0])  ## pandas._libs.tslibs.timestamps.Timestamp
@@ -134,10 +130,10 @@ KBar = indicator_forKBar_short.KBar(Date,cycle_duration)    ## 設定cycle_durat
 #KBar_dic['amount'].size    ##5585
 #KBar_dic['time'].size    ##5585
 
-for i in range(KBar_dic['time'].size):
+for i in range(KBar_dic['date'].size):
     
     #time = datetime.datetime.strptime(KBar_dic['time'][i],'%Y%m%d%H%M%S%f')
-    time = KBar_dic['time'][i]
+    time = KBar_dic['date'][i]
     #prod = KBar_dic['product'][i]
     open_price= KBar_dic['open'][i]
     close_price= KBar_dic['close'][i]
@@ -176,9 +172,9 @@ KBar_dic = {}
 # KBar_dic['volume'] =  Volume_array
 
  ## 形成 KBar 字典 (新週期的):
-KBar_dic['time'] =  KBar.TAKBar['time']   
+KBar_dic['date'] =  KBar.TAKBar['date']   
 #KBar_dic['product'] =  KBar.TAKBar['product']
-KBar_dic['product'] = np.repeat('tsmc', KBar_dic['time'].size)
+#KBar_dic['product'] = np.repeat('tsmc', KBar_dic['time'].size)
 KBar_dic['open'] = KBar.TAKBar['open']
 KBar_dic['high'] =  KBar.TAKBar['high']
 KBar_dic['low'] =  KBar.TAKBar['low']
@@ -241,7 +237,7 @@ def calculate_rsi(df, period=14):
 
 KBar_df['RSI_long'] = calculate_rsi(KBar_df, LongRSIPeriod)
 KBar_df['RSI_short'] = calculate_rsi(KBar_df, ShortRSIPeriod)
-KBar_df['RSI_Middle']=np.array([50]*len(KBar_dic['time']))
+KBar_df['RSI_Middle']=np.array([50]*len(KBar_dic['date']))
 
 ### 尋找最後 NAN值的位置
 last_nan_index_RSI = KBar_df['RSI_long'][::-1].index[KBar_df['RSI_long'][::-1].apply(pd.isna)][0]
@@ -281,16 +277,16 @@ with st.expander("K線圖, 移動平均線"):
     fig1 = make_subplots(specs=[[{"secondary_y": True}]])
     
     #### include candlestick with rangeselector
-    fig1.add_trace(go.Candlestick(x=KBar_df['Time'],
+    fig1.add_trace(go.Candlestick(x=KBar_df['Date'],
                     open=KBar_df['Open'], high=KBar_df['High'],
                     low=KBar_df['Low'], close=KBar_df['Close'], name='K線'),
                    secondary_y=True)   ## secondary_y=True 表示此圖形的y軸scale是在右邊而不是在左邊
     
     #### include a go.Bar trace for volumes
-    fig1.add_trace(go.Bar(x=KBar_df['Time'], y=KBar_df['Volume'], name='成交量', marker=dict(color='black')),secondary_y=False)  ## secondary_y=False 表示此圖形的y軸scale是在左邊而不是在右邊
-    fig1.add_trace(go.Scatter(x=KBar_df['Time'][last_nan_index_MA+1:], y=KBar_df['MA_long'][last_nan_index_MA+1:], mode='lines',line=dict(color='orange', width=2), name=f'{LongMAPeriod}-根 K棒 移動平均線'), 
+    fig1.add_trace(go.Bar(x=KBar_df['Date'], y=KBar_df['Volume'], name='成交量', marker=dict(color='black')),secondary_y=False)  ## secondary_y=False 表示此圖形的y軸scale是在左邊而不是在右邊
+    fig1.add_trace(go.Scatter(x=KBar_df['Date'][last_nan_index_MA+1:], y=KBar_df['MA_long'][last_nan_index_MA+1:], mode='lines',line=dict(color='orange', width=2), name=f'{LongMAPeriod}-根 K棒 移動平均線'), 
                   secondary_y=True)
-    fig1.add_trace(go.Scatter(x=KBar_df['Time'][last_nan_index_MA+1:], y=KBar_df['MA_short'][last_nan_index_MA+1:], mode='lines',line=dict(color='pink', width=2), name=f'{ShortMAPeriod}-根 K棒 移動平均線'), 
+    fig1.add_trace(go.Scatter(x=KBar_df['Date'][last_nan_index_MA+1:], y=KBar_df['MA_short'][last_nan_index_MA+1:], mode='lines',line=dict(color='pink', width=2), name=f'{ShortMAPeriod}-根 K棒 移動平均線'), 
                   secondary_y=True)
     
     fig1.layout.yaxis2.showgrid=True
@@ -301,26 +297,18 @@ with st.expander("K線圖, 移動平均線"):
 with st.expander("K線圖, 長短 RSI"):
     fig2 = make_subplots(specs=[[{"secondary_y": True}]])
     #### include candlestick with rangeselector
-    fig2.add_trace(go.Candlestick(x=KBar_df['Time'],
+    fig2.add_trace(go.Candlestick(x=KBar_df['Date'],
                     open=KBar_df['Open'], high=KBar_df['High'],
                     low=KBar_df['Low'], close=KBar_df['Close'], name='K線'),
                    secondary_y=True)   ## secondary_y=True 表示此圖形的y軸scale是在右邊而不是在左邊
     
-    fig2.add_trace(go.Scatter(x=KBar_df['Time'][last_nan_index_RSI+1:], y=KBar_df['RSI_long'][last_nan_index_RSI+1:], mode='lines',line=dict(color='red', width=2), name=f'{LongRSIPeriod}-根 K棒 移動 RSI'), 
+    fig2.add_trace(go.Scatter(x=KBar_df['Date'][last_nan_index_RSI+1:], y=KBar_df['RSI_long'][last_nan_index_RSI+1:], mode='lines',line=dict(color='red', width=2), name=f'{LongRSIPeriod}-根 K棒 移動 RSI'), 
                   secondary_y=False)
-    fig2.add_trace(go.Scatter(x=KBar_df['Time'][last_nan_index_RSI+1:], y=KBar_df['RSI_short'][last_nan_index_RSI+1:], mode='lines',line=dict(color='blue', width=2), name=f'{ShortRSIPeriod}-根 K棒 移動 RSI'), 
+    fig2.add_trace(go.Scatter(x=KBar_df['Date'][last_nan_index_RSI+1:], y=KBar_df['RSI_short'][last_nan_index_RSI+1:], mode='lines',line=dict(color='blue', width=2), name=f'{ShortRSIPeriod}-根 K棒 移動 RSI'), 
                   secondary_y=False)
     
     fig2.layout.yaxis2.showgrid=True
     st.plotly_chart(fig2, use_container_width=True)
-
-
-
-
-
-
-
-
 
 
 
