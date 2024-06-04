@@ -55,8 +55,16 @@ end_date = datetime.datetime.strptime(end_date,'%Y/%m/%d')
 start_date_timestamp = start_date.timestamp()
 end_date_timestamp = end_date.timestamp()
 
-df = df_original[(df_original['time'].apply(lambda x: x.timestamp()) >= start_date_timestamp) & 
-                 (df_original['time'].apply(lambda x: x.timestamp()) <= end_date_timestamp)]
+# 將'time'列轉換為timestamp
+df_original['time_timestamp'] = df_original['time'].apply(lambda x: x.timestamp())
+
+# 選擇資料區間
+df = df_original[(df_original['time_timestamp'] >= start_date_timestamp) & 
+                 (df_original['time_timestamp'] <= end_date_timestamp)]
+
+# 刪除剛剛新增的'time_timestamp'列
+df.drop(columns=['time_timestamp'], inplace=True)
+
 
 
 ###### (2) 轉化為字典 ######:
