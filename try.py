@@ -1,17 +1,12 @@
 # 載入必要模組
 import os
-#os.chdir(r'C:\Users\user\Dropbox\系務\專題實作\112\金融看板\for students')
-#import haohaninfo
-#from order_Lo8 import Record
 import numpy as np
-#from talib.abstract import SMA,EMA, WMA, RSI, BBANDS, MACD
-#import sys
-import indicator_f_Lo2_short,datetime, indicator_forKBar_short
-#import datetime
+import datetime
 import pandas as pd
 import streamlit as st 
 import streamlit.components.v1 as stc 
-
+import indicator_f_Lo2_short
+import indicator_forKBar_short
 
 ###### (1) 開始設定 ######
 html_temp = """
@@ -22,36 +17,13 @@ html_temp = """
 		"""
 stc.html(html_temp)
 
-#df = pd.read_excel("kbars_台積電_1100701_1100708_2.xlsx")
-#df = pd.read_excel("kbars_2330_2022-07-01-2022-07-31.xlsx")
-
-# ## 讀取 excel 檔
-# df_original = pd.read_excel("kbars_2330_2022-01-01-2022-11-18.xlsx")
-
-# ## 保存为Pickle文件:
-# df_original.to_pickle('kbars_2330_2022-01-01-2022-11-18.pkl')
-
-
-
+# 加載數據
 @st.cache_data(ttl=3600, show_spinner="正在加載資料...") 
 def load_data(url):
     df = pd.read_pickle(url)
     return df
 
-
-
 df_original = load_data('2303.pkl')
-
-#df.columns  ## Index(['Unnamed: 0', 'time', 'open', 'low', 'high', 'close', 'volume','amount'], dtype='object')
-#df_original = df_original.drop('Unnamed: 0',axis=1)
-#df.columns  ## Index(['time', 'open', 'low', 'high', 'close', 'volume', 'amount'], dtype='object')
-#df['time']
-#type(df['time'])  ## pandas.core.series.Series
-#df['time'][11]
-#df.head()
-#df.tail()
-#type(df['time'][0])
-
 
 ##### 選擇資料區間
 st.subheader("選擇開始與結束的日期, 區間:2022/01/02 至 2024/06/03")
@@ -62,8 +34,7 @@ end_date = datetime.datetime.strptime(end_date,'%Y/%m/%d')
 # 使用条件筛选选择时间区间的数据
 df = df_original[(df_original['date'] >= start_date) & (df_original['date'] <= end_date)]
 
-
-###### (2) 轉化為字典 ######:
+######  (2) 轉化為字典 ######:
 KBar_dic = df.to_dict()
 #type(KBar_dic)
 #KBar_dic.keys()  ## dict_keys(['time', 'open', 'low', 'high', 'close', 'volume', 'amount'])
